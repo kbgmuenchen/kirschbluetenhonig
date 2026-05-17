@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>kirschbluetenhonig</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🌸</text></svg>">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600;700&display=swap" rel="stylesheet">
+    <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: 'Open Sans', sans-serif;
+            background-color: #fce4ec;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            padding: 20px 32px;
+        }
+
+        @media (max-width: 430px) {
+            body { padding: 20px 20px; }
+            .card { padding: 40px 16px 52px; }
+        }
+
+        /* ── White Card ── */
+        .card {
+            background: #ffffff;
+            border-radius: 28px;
+            padding: 40px 32px 52px;
+            max-width: 520px;
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+            box-shadow: 0 8px 40px rgba(0,0,0,0.15);
+        }
+
+        /* ── Avatar ── */
+        .avatar {
+            width: 110px;
+            height: 110px;
+            border-radius: 50%;
+            object-fit: cover;
+            margin-bottom: 20px;
+            border: 4px solid #ffffff;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.15);
+        }
+
+        /* ── Heading ── */
+        h1 {
+            font-size: 1.9rem;
+            font-weight: 700;
+            color: #1a1a1a;
+            margin-bottom: 14px;
+        }
+
+        /* ── Bio ── */
+        .bio {
+            font-size: 15px;
+            color: #4a4a4a;
+            line-height: 1.65;
+            margin-bottom: 20px;
+        }
+
+        /* ── Instagram Icon ── */
+        .social-icon {
+            margin-bottom: 24px;
+        }
+        .social-icon svg {
+            width: 22px;
+            height: 22px;
+        }
+
+        /* ── Turnstile ── */
+        .verify-box {
+            display: flex;
+            justify-content: center;
+            margin-bottom: 16px;
+        }
+
+        /* ── Button ── */
+        .btn {
+            display: block;
+            width: 100%;
+            background-color: #e35a86;
+            color: #ffffff;
+            padding: 16px;
+            border-radius: 50px;
+            text-decoration: none;
+            font-weight: 700;
+            font-size: 1.05rem;
+            text-align: center;
+            border: none;
+            cursor: pointer;
+            transition: background-color 0.2s ease, transform 0.15s cubic-bezier(0,0,0.5,1);
+        }
+        .btn:hover { background-color: #c94a76; }
+        .btn:active { transform: scale(0.96); }
+
+        .hidden { display: none !important; }
+
+        /* ── Error ── */
+        .error {
+            margin-top: 12px;
+            font-size: 0.85rem;
+            color: #b71c1c;
+            background: rgba(183,28,28,0.08);
+            padding: 10px 14px;
+            border-radius: 8px;
+            display: none;
+        }
+        .error.show { display: block; }
+    </style>
+</head>
+<body>
+
+    <div class="card">
+
+        <!-- Profile Picture -->
+        <img src="profile.png" alt="Profilbild" class="avatar">
+
+        <h1>Ready for takeoff 🛫</h1>
+
+        <p class="bio">Robots are strictly prohibited. 🤖<br>Verify to continue!</p>
+
+        <!-- Instagram Icon -->
+        <div class="social-icon">
+            <a href="https://www.instagram.com/kirschbluetenhonig" target="_blank" rel="noopener noreferrer">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#1a1a1a" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="2" y="2" width="20" height="20" rx="5" ry="5"/>
+                    <circle cx="12" cy="12" r="4"/>
+                    <circle cx="17.5" cy="6.5" r="1" fill="#1a1a1a" stroke="none"/>
+                </svg>
+            </a>
+        </div>
+
+        <!-- Turnstile -->
+        <div class="verify-box">
+            <div class="cf-turnstile"
+                 data-sitekey="0x4AAAAAADQpzMA3Dkip-Rbn"
+                 data-callback="onSuccess">
+            </div>
+        </div>
+
+        <!-- Button (hidden until verified) -->
+        <a id="target-btn" class="btn hidden">
+            Boarding Pass Accepted
+        </a>
+
+        <div id="error-msg" class="error"></div>
+    </div>
+
+    <script>
+        async function onSuccess(token) {
+            try {
+                const res = await fetch('/verify', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ token })
+                });
+
+                if (!res.ok) throw new Error('Serverantwort fehlgeschlagen');
+
+                const data = await res.json();
+
+                if (data.success) {
+                    const btn = document.getElementById('target-btn');
+                    btn.href = '/api/go';
+                    btn.classList.remove('hidden');
+                    clearError();
+                } else {
+                    showError(data.message || 'Verifizierung fehlgeschlagen.');
+                    resetTurnstile();
+                }
+            } catch (err) {
+                console.error('Verifikationsfehler:', err);
+                showError('Ein Fehler ist aufgetreten. Bitte erneut versuchen.');
+                resetTurnstile();
+            }
+        }
+
+        function showError(msg) {
+            const el = document.getElementById('error-msg');
+            el.textContent = msg;
+            el.classList.add('show');
+        }
+
+        function clearError() {
+            const el = document.getElementById('error-msg');
+            el.textContent = '';
+            el.classList.remove('show');
+        }
+
+        function resetTurnstile() {
+            if (window.turnstile) window.turnstile.reset();
+        }
+    </script>
+</body>
+</html>
