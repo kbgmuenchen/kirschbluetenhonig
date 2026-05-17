@@ -99,11 +99,32 @@
             border: none;
             cursor: pointer;
             transition: background-color 0.2s ease, transform 0.15s cubic-bezier(0,0,0.5,1);
+            /* Prevent the button from being a direct visible href target */
+            pointer-events: none;
+            opacity: 0.5;
+        }
+        .btn.active {
+            pointer-events: auto;
+            opacity: 1;
         }
         .btn:hover { background-color: #c94a76; }
         .btn:active { transform: scale(0.96); }
 
         .hidden { display: none !important; }
+
+        /* ── Spinner shown while verifying ── */
+        .spinner {
+            width: 22px;
+            height: 22px;
+            border: 3px solid rgba(227,90,134,0.25);
+            border-top-color: #e35a86;
+            border-radius: 50%;
+            animation: spin 0.7s linear infinite;
+            margin: 0 auto 16px;
+            display: none;
+        }
+        .spinner.show { display: block; }
+        @keyframes spin { to { transform: rotate(360deg); } }
 
         /* ── Error ── */
         .error {
@@ -140,49 +161,107 @@
             </a>
         </div>
 
-        <!-- Turnstile -->
+        <!-- Turnstile widget -->
         <div class="verify-box">
             <div class="cf-turnstile"
                  data-sitekey="0x4AAAAAADQpzMA3Dkip-Rbn"
-                 data-callback="onSuccess">
+                 data-callback="onTurnstileSuccess"
+                 data-error-callback="onTurnstileError"
+                 data-expired-callback="onTurnstileExpired">
             </div>
         </div>
 
-        <!-- Button (hidden until verified) -->
-        <a id="target-btn" class="btn hidden">
-            Boarding Pass Accepted
-        </a>
+        <!-- Spinner shown during server verification -->
+        <div id="spinner" class="spinner"></div>
 
-        <div id="error-msg" class="error"></div>
+        <!--
+            Button is rendered but visually disabled until verification succeeds.
+            It has no href by default — clicking triggers a JS redirect via fetch,
+            so the destination URL is never exposed in the DOM before verification.
+        -->
+        <button id="target-btn" class="btn" disabled aria-disabled="true" aria-label="Weiterleitung nach Verifizierung">
+            Boarding Pass Accepted
+        </button>
+
+        <div id="error-msg" class="error" role="alert"></div>
     </div>
 
     <script>
-        async function onSuccess(token) {
+        // ── State ───────────────────────────────────────────────────────────
+        let verified = false;
+
+        // ── Turnstile callbacks ─────────────────────────────────────────────
+        async function onTurnstileSuccess(token) {
+            if (verified) return; // guard against double-fire
+            showSpinner(true);
+            clearError();
+
             try {
                 const res = await fetch('/verify', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ token })
+                    body: JSON.stringify({ token }),
                 });
-
-                if (!res.ok) throw new Error('Serverantwort fehlgeschlagen');
 
                 const data = await res.json();
 
-                if (data.success) {
-                    const btn = document.getElementById('target-btn');
-                    btn.href = '/api/go';
-                    btn.classList.remove('hidden');
-                    clearError();
+                if (res.ok && data.success) {
+                    verified = true;
+                    activateButton();
                 } else {
-                    showError(data.message || 'Verifizierung fehlgeschlagen.');
+                    showError(data.message || 'Verifizierung fehlgeschlagen. Bitte erneut versuchen.');
                     resetTurnstile();
                 }
             } catch (err) {
-                console.error('Verifikationsfehler:', err);
+                console.error('Verification error:', err);
                 showError('Ein Fehler ist aufgetreten. Bitte erneut versuchen.');
                 resetTurnstile();
+            } finally {
+                showSpinner(false);
             }
+        }
+
+        function onTurnstileError() {
+            showError('Turnstile-Fehler. Bitte Seite neu laden.');
+        }
+
+        function onTurnstileExpired() {
+            verified = false;
+            deactivateButton();
+            showError('Verifizierung abgelaufen. Bitte erneut bestätigen.');
+            resetTurnstile();
+        }
+
+        // ── Button logic ─────────────────────────────────────────────────────
+        function activateButton() {
+            const btn = document.getElementById('target-btn');
+            btn.classList.add('active');
+            btn.disabled = false;
+            btn.setAttribute('aria-disabled', 'false');
+            btn.addEventListener('click', handleGo, { once: true });
+        }
+
+        function deactivateButton() {
+            const btn = document.getElementById('target-btn');
+            btn.classList.remove('active');
+            btn.disabled = true;
+            btn.setAttribute('aria-disabled', 'true');
+        }
+
+        /**
+         * Navigate to /api/go. The server checks the HMAC-signed cookie
+         * and will redirect to the target or back to / if invalid.
+         * Using window.location.href means the cookie is sent automatically.
+         */
+        function handleGo(e) {
+            e.preventDefault();
+            if (!verified) return;
+            window.location.href = '/api/go';
+        }
+
+        // ── Helpers ──────────────────────────────────────────────────────────
+        function showSpinner(on) {
+            document.getElementById('spinner').classList.toggle('show', on);
         }
 
         function showError(msg) {
