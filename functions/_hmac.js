@@ -38,7 +38,7 @@ export async function verifyToken(cookieValue, secret) {
     const receivedSig = cookieValue.slice(dot + 1);
 
     // UUID must look like a UUID (basic sanity check)
-    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(uuid)) return false;
+    if (!/^[0-9a-f-]{36}$/.test(uuid)) return false;
 
     const expectedSig = await sign(uuid, secret);
 

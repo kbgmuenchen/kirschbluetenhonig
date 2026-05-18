@@ -21,12 +21,6 @@ export async function onRequestPost(context) {
         return Response.json({ success: false, message: 'Server misconfigured.' }, { status: 500 });
     }
 
-    // ── CSRF: verify Origin header matches the allowed origin ───────────────
-    const origin = request.headers.get('Origin');
-    if (env.ALLOWED_ORIGIN && origin !== env.ALLOWED_ORIGIN) {
-        return Response.json({ success: false, message: 'Forbidden.' }, { status: 403 });
-    }
-
     // ── Parse request body ───────────────────────────────────────────────────
     let token;
     try {

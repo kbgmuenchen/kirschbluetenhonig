@@ -12,7 +12,7 @@
 
 import { verifyToken, parseCookie } from '../_hmac.js';
 
-export async function onRequestGet(context) {
+export async function onRequest(context) {
     const { request, env } = context;
 
     // ── Validate env ────────────────────────────────────────────────────────
